@@ -253,7 +253,29 @@
 
     // Camera and controls
     const player = { x: 0, z: 5, y: 1.7 };
-    camera.position.set(player.x, player.y, player.z);
+     // Collision boundaries for major resort buildings.
+    // Each box defines the building's center and half-width/depth.
+    const solidBuildings = [
+      { x: 0, z: -38, halfX: 21, halfZ: 12.5 },
+      { x: -30, z: -24, halfX: 6.5, halfZ: 6.5 },
+      { x: 30, z: -25, halfX: 6.5, halfZ: 6.5 },
+      { x: -32, z: 10, halfX: 6.5, halfZ: 6.5 },
+      { x: 32, z: 12, halfX: 6.5, halfZ: 6.5 },
+      { x: -22, z: 38, halfX: 6.5, halfZ: 6.5 },
+      { x: 23, z: 40, halfX: 6.5, halfZ: 6.5 }
+    ];
+
+    const playerRadius = 0.45;
+
+    function collidesWithBuilding(x, z) {
+      return solidBuildings.some(b =>
+        x + playerRadius > b.x - b.halfX &&
+        x - playerRadius < b.x + b.halfX &&
+        z + playerRadius > b.z - b.halfZ &&
+        z - playerRadius < b.z + b.halfZ
+      );
+    }
+  camera.position.set(player.x, player.y, player.z);
 
     let yaw = 0;
     let pitch = 0;
