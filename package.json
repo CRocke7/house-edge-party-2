@@ -1,0 +1,13 @@
+{
+  "name": "house-edge-party-2",
+  "version": "1.0.0",
+  "description": "A colorful multiplayer 3D resort game",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
