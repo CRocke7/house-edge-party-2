@@ -389,22 +389,38 @@
       const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
       const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
+      let moveX = 0;
+      let moveZ = 0;
+
       if (keys.has("KeyW")) {
-        player.x += forward.x * speed * 0.016;
-        player.z += forward.z * speed * 0.016;
+        moveX += forward.x;
+        moveZ += forward.z;
       }
       if (keys.has("KeyS")) {
-        player.x -= forward.x * speed * 0.016;
-        player.z -= forward.z * speed * 0.016;
-      }
-      if (keys.has("KeyA")) {
-        player.x -= right.x * speed * 0.016;
-        player.z -= right.z * speed * 0.016;
+        moveX -= forward.x;
+        moveZ -= forward.z;
       }
       if (keys.has("KeyD")) {
-        player.x += right.x * speed * 0.016;
-        player.z += right.z * speed * 0.016;
+        moveX += right.x;
+        moveZ += right.z;
       }
+      if (keys.has("KeyA")) {
+        moveX -= right.x;
+        moveZ -= right.z;
+      }
+
+      const length = Math.hypot(moveX, moveZ);
+      if (length > 0) {
+        moveX = moveX / length * speed * 0.016;
+        moveZ = moveZ / length * speed * 0.016;
+
+        if (!collidesWithBuilding(player.x + moveX, player.z)) {
+          player.x += moveX;
+        }
+        if (!collidesWithBuilding(player.x, player.z + moveZ)) {
+          player.z += moveZ;
+        }
+      }      }
 
       verticalVelocity -= 18 * 0.016;
       player.y += verticalVelocity * 0.016;
