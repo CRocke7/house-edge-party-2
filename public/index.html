@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>House Edge Party</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #73c9ff;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+    canvas { display: block; }
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      text-shadow: 2px 2px 4px #222;
+    }
+    #brand {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      font-size: 25px;
+      font-weight: 900;
+    }
+    #stats {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      text-align: right;
+      font-weight: bold;
+      line-height: 1.8;
+    }
+    #help {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #132238cc;
+      padding: 12px 18px;
+      border-radius: 12px;
+      text-align: center;
+      width: max-content;
+      max-width: 92vw;
+      line-height: 1.7;
+    }
+    #start {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #10243acb;
+      z-index: 5;
+    }
+    #startPanel {
+      text-align: center;
+      padding: 32px;
+      max-width: 440px;
+    }
+    #start h1 { font-size: clamp(32px, 7vw, 56px); margin: 0 0 10px; }
+    #start p { line-height: 1.6; color: #e5f2ff; }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 14px 24px;
+      background: #ffca38;
+      color: #1c2434;
+      font-size: 17px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    #notice {
+      position: absolute;
+      top: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #132238cc;
+      padding: 10px 16px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div id="brand">🎲 HOUSE EDGE PARTY</div>
+    <div id="stats">
+      <div>🪙 <span id="chips">1,000</span> virtual chips</div>
+      <div>👥 <span id="count">1</span> players online</div>
+    </div>
+    <div id="notice">Welcome to the resort!</div>
+    <div id="help">
+      <b>WASD</b> Move &nbsp; <b>Mouse</b> Look around<br>
+      <b>Space</b> Jump &nbsp; <b>Esc</b> Release mouse
+    </div>
+  </div>
+
+  <div id="start">
+    <div id="startPanel">
+      <h1>HOUSE EDGE PARTY</h1>
+      <p>Your resort. Your friends. Your game.<br>
+      Explore the resort and meet other players.</p>
+      <button id="play">ENTER THE RESORT</button>
+      <p style="font-size:12px">Virtual chips only · No real-money gambling</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+    import { io } from "https://cdn.socket.io/4.8.1/socket.io.esm.min.js";
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x78caff);
+    scene.fog = new THREE.Fog(0x78caff, 45, 150);
+
+    const camera = new THREE.PerspectiveCamera(
+      75, window.innerWidth / window.innerHeight, 0.1, 300
+    );
+    camera.rotation.order = "YXZ";
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x557755, 2));
+
+    const sun = new THREE.DirectionalLight(0xffffff, 3);
+    sun.position.set(30, 50, 20);
+    sun.castShadow = true;
+    scene.add(sun);
+
+    function block(x, y, z, sx, sy, sz, color) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(sx, sy, sz),
+        new THREE.MeshStandardMaterial({ color, roughness: 0.85 })
+      );
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    // Resort grounds
+    block(0, -0.5, 0, 180, 1, 180, 0x55b957);
+    block(0, 0.02, 0, 18, 0.08, 180, 0xe5d6b2);
+    block(0, 0.04, 0, 180, 0.08, 18, 0xe5d6b2);
+
+    // Main casino building
+    block(0, 5, -38, 38, 10, 22, 0xf5f1e8);
+    block(0, 11, -38, 42, 2, 25, 0x303d58);
+    block(0, 7, -26.7, 17, 3, 1, 0x24324b);
+    block(0, 7.2, -26, 11, 1.4, 0xffc83d);
+    block(-13, 5, -26.4, 3, 6, 1, 0x58d9ff);
+    block(13, 5, -26.4, 3, 6, 1, 0x58d9ff);
+
+    // Colorful hotel towers
+    const buildings = [
+      [-30, -24, 0xff626b], [30, -25, 0x9b79ff],
+      [-32, 10, 0xffbf47], [32, 12, 0x43d9bd],
+      [-22, 38, 0x64a6ff], [23, 40, 0xff85c2]
+    ];
+    for (const [x, z, color] of buildings) {
+      const height = 12 + Math.random() * 9;
+      block(x, height / 2, z, 12, height, 12, color);
+      block(x, height + 0.5, z, 13, 1, 13, 0xf4e7c5);
+      for (let y = 3; y < height - 1; y += 3) {
+        for (let dx of [-3, 0, 3]) {
+          block(x + dx, y, z + 6.1, 1.5, 1.5, 0x8be4ff);
+        }
+      }
+    }
+
+    // Palm trees made from simple blocks
+    function palm(x, z) {
+      block(x, 3, z, 0.9, 6, 0.9, 0x9b693e);
+      for (let i = 0; i < 6; i++) {
+        const angle = i * Math.PI / 3;
+        const leaf = block(
+          x + Math.cos(angle) * 2, 6, z + Math.sin(angle) * 2,
+          4, 0.45, 1, 0x159447
+        );
+        leaf.rotation.y = -angle;
+      }
+      block(x, 6.5, z, 2, 1, 2, 0x238c42);
+    }
+    for (let i = -4; i <= 4; i++) {
+      palm(i * 10, -12);
+      palm(i * 10, 14);
+    }
+
+    // Resort entrance sign
+    block(0, 3, -15, 18, 4, 1, 0x26334b);
+    block(0, 3.3, -14.4, 14, 1.7, 0xffcb43);
+
+    // Fountain
+    block(23, 0.3, -3, 12, 0.6, 12, 0x9da8b7);
+    block(23, 0.7, -3, 9, 0.5, 9, 0x42c8f5);
+    block(23, 1.4, -3, 2, 1.5, 2, 0xffffff);
+
+    // Decorative glowing-looking lights
+    for (const x of [-12, 12]) {
+      for (const z of [-20, 20]) {
+        block(x, 3, z, 0.6, 6, 0.6, 0x26334b);
+        const lamp = new THREE.Mesh(
+          new THREE.BoxGeometry(2, 0.6, 2),
+          new THREE.MeshBasicMaterial({ color: 0xffe67a })
+        );
+        lamp.position.set(x, 6.2, z);
+        scene.add(lamp);
+      }
+    }
+
+    // A simple block avatar for each player
+    const avatars = new Map();
+
+    function makeAvatar(color, id) {
+      const group = new THREE.Group();
+      const material = new THREE.MeshStandardMaterial({ color });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.45), material);
+      body.position.y = 1.35;
+      group.add(body);
+
+      const head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 0.85, 0.85),
+        new THREE.MeshStandardMaterial({ color: 0xffd1a1 })
+      );
+      head.position.y = 2.4;
+      group.add(head);
+
+      for (const x of [-0.25, 0.25]) {
+        const leg = new THREE.Mesh(
+          new THREE.BoxGeometry(0.32, 0.8, 0.35),
+          new THREE.MeshStandardMaterial({ color: 0x293b65 })
+        );
+        leg.position.set(x, 0.4, 0);
+        group.add(leg);
+      }
+
+      group.position.y = 0;
+      group.userData.playerId = id;
+      scene.add(group);
+      avatars.set(id, group);
+      return group;
+    }
+
+    // Camera and controls
+    const player = { x: 0, z: 5, y: 1.7 };
+    camera.position.set(player.x, player.y, player.z);
+
+    let yaw = 0;
+    let pitch = 0;
+    let locked = false;
+    let verticalVelocity = 0;
+    let onGround = true;
+    const keys = new Set();
+
+    const socket = io();
+    let myId = null;
+    const remotePlayers = new Map();
+
+    socket.on("connect", () => {
+      showNotice("Connected to the resort server!");
+    });
+
+    socket.on("welcome", (data) => {
+      myId = data.id;
+      for (const p of Object.values(data.players)) {
+        if (p.id !== myId) addRemotePlayer(p);
+      }
+      updateCount();
+    });
+
+    socket.on("playerJoined", (p) => {
+      addRemotePlayer(p);
+      showNotice(`${p.name} joined the resort!`);
+      updateCount();
+    });
+
+    socket.on("playerMoved", (p) => {
+      const avatar = avatars.get(p.id);
+      if (avatar) {
+        avatar.position.x = p.x;
+        avatar.position.z = p.z;
+      }
+    });
+
+    socket.on("playerLeft", (id) => {
+      const avatar = avatars.get(id);
+      if (avatar) scene.remove(avatar);
+      avatars.delete(id);
+      remotePlayers.delete(id);
+      updateCount();
+    });
+
+    function addRemotePlayer(p) {
+      if (p.id === myId || avatars.has(p.id)) return;
+      const avatar = makeAvatar(p.color, p.id);
+      avatar.position.set(p.x, 0, p.z);
+      remotePlayers.set(p.id, p);
+    }
+
+    function updateCount() {
+      document.getElementById("count").textContent = avatars.size + 1;
+    }
+
+    let noticeTimer;
+    function showNotice(message) {
+      const notice = document.getElementById("notice");
+      notice.textContent = message;
+      clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => {
+        notice.textContent = "Explore the resort!";
+      }, 3500);
+    }
+
+    document.getElementById("play").addEventListener("click", () => {
+      document.getElementById("start").style.display = "none";
+      renderer.domElement.requestPointerLock();
+    });
+
+    document.addEventListener("pointerlockchange", () => {
+      locked = document.pointerLockElement === renderer.domElement;
+    });
+
+    document.addEventListener("mousemove", (event) => {
+      if (!locked) return;
+      yaw -= event.movementX * 0.002;
+      pitch -= event.movementY * 0.002;
+      pitch = Math.max(-1.45, Math.min(1.45, pitch));
+    });
+
+    document.addEventListener("keydown", (event) => {
+      keys.add(event.code);
+      if (event.code === "Space" && onGround) {
+        verticalVelocity = 7;
+        onGround = false;
+      }
+    });
+
+    document.addEventListener("keyup", (event) => keys.delete(event.code));
+
+    document.addEventListener("pointerlockchange", () => {
+      if (!locked && document.getElementById("start").style.display === "none") {
+        showNotice("Click the game to look around again.");
+      }
+    });
+
+    renderer.domElement.addEventListener("click", () => {
+      if (!locked && document.getElementById("start").style.display === "none") {
+        renderer.domElement.requestPointerLock();
+      }
+    });
+
+    let lastSent = 0;
+    function animate(time) {
+      requestAnimationFrame(animate);
+
+      const speed = keys.has("ShiftLeft") ? 12 : 7;
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+      if (keys.has("KeyW")) {
+        player.x += forward.x * speed * 0.016;
+        player.z += forward.z * speed * 0.016;
+      }
+      if (keys.has("KeyS")) {
+        player.x -= forward.x * speed * 0.016;
+        player.z -= forward.z * speed * 0.016;
+      }
+      if (keys.has("KeyA")) {
+        player.x -= right.x * speed * 0.016;
+        player.z -= right.z * speed * 0.016;
+      }
+      if (keys.has("KeyD")) {
+        player.x += right.x * speed * 0.016;
+        player.z += right.z * speed * 0.016;
+      }
+
+      verticalVelocity -= 18 * 0.016;
+      player.y += verticalVelocity * 0.016;
+      if (player.y < 1.7) {
+        player.y = 1.7;
+        verticalVelocity = 0;
+        onGround = true;
+      }
+
+      player.x = THREE.MathUtils.clamp(player.x, -80, 80);
+      player.z = THREE.MathUtils.clamp(player.z, -80, 80);
+
+      camera.position.set(player.x, player.y, player.z);
+      camera.rotation.set(pitch, yaw, 0, "YXZ");
+
+      if (time - lastSent > 80 && socket.connected) {
+        socket.emit("move", { x: player.x, z: player.z });
+        lastSent = time;
+      }
+
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate);
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
